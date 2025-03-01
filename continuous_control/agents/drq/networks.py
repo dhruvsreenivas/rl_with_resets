@@ -15,7 +15,7 @@ from continuous_control.networks.policies import NormalTanhPolicy
 class Encoder(nn.Module):
     features: Sequence[int] = (32, 32, 32, 32)
     strides: Sequence[int] = (2, 1, 1, 1)
-    padding: str = 'VALID'
+    padding: str = "VALID"
 
     @nn.compact
     def __call__(self, observations: jnp.ndarray) -> jnp.ndarray:
@@ -23,11 +23,13 @@ class Encoder(nn.Module):
 
         x = observations.astype(jnp.float32) / 255.0
         for features, stride in zip(self.features, self.strides):
-            x = nn.Conv(features,
-                        kernel_size=(3, 3),
-                        strides=(stride, stride),
-                        kernel_init=default_init(),
-                        padding=self.padding)(x)
+            x = nn.Conv(
+                features,
+                kernel_size=(3, 3),
+                strides=(stride, stride),
+                kernel_init=default_init(),
+                padding=self.padding,
+            )(x)
             x = nn.relu(x)
 
         if len(x.shape) == 4:
@@ -41,22 +43,30 @@ class DrQDoubleCritic(nn.Module):
     hidden_dims: Sequence[int]
     cnn_features: Sequence[int] = (32, 32, 32, 32)
     cnn_strides: Sequence[int] = (2, 1, 1, 1)
-    cnn_padding: str = 'VALID'
+    cnn_padding: str = "VALID"
     latent_dim: int = 50
+    use_layer_norm: bool = False
+    pass_grads_through_encoder: bool = True
 
     @nn.compact
-    def __call__(self, observations: jnp.ndarray,
-                 actions: jnp.ndarray) -> Tuple[jnp.ndarray, jnp.ndarray]:
-        x = Encoder(self.cnn_features,
-                    self.cnn_strides,
-                    self.cnn_padding,
-                    name='SharedEncoder')(observations)
+    def __call__(
+        self, observations: jnp.ndarray, actions: jnp.ndarray
+    ) -> Tuple[jnp.ndarray, jnp.ndarray]:
+        x = Encoder(
+            self.cnn_features, self.cnn_strides, self.cnn_padding, name="SharedEncoder"
+        )(observations)
+
+        # If we want to stop gradients through the encoder we do so here.
+        if not self.pass_grads_through_encoder:
+            x = jax.lax.stop_gradient(x)
 
         x = nn.Dense(self.latent_dim)(x)
         x = nn.LayerNorm()(x)
         x = nn.tanh(x)
 
-        return DoubleCritic(self.hidden_dims)(x, actions)
+        return DoubleCritic(self.hidden_dims, use_layer_norm=self.use_layer_norm)(
+            x, actions
+        )
 
 
 class DrQPolicy(nn.Module):
@@ -64,24 +74,24 @@ class DrQPolicy(nn.Module):
     action_dim: int
     cnn_features: Sequence[int] = (32, 32, 32, 32)
     cnn_strides: Sequence[int] = (2, 1, 1, 1)
-    cnn_padding: str = 'VALID'
+    cnn_padding: str = "VALID"
     latent_dim: int = 50
+    pass_grads_through_encoder: bool = False
 
     @nn.compact
-    def __call__(self,
-                 observations: jnp.ndarray,
-                 temperature: float = 1.0) -> tfd.Distribution:
-        x = Encoder(self.cnn_features,
-                    self.cnn_strides,
-                    self.cnn_padding,
-                    name='SharedEncoder')(observations)
+    def __call__(
+        self, observations: jnp.ndarray, temperature: float = 1.0
+    ) -> tfd.Distribution:
+        x = Encoder(
+            self.cnn_features, self.cnn_strides, self.cnn_padding, name="SharedEncoder"
+        )(observations)
 
-        # We do not update conv layers with policy gradients.
-        x = jax.lax.stop_gradient(x)
+        # If we want to stop gradients through the encoder we do so here.
+        if not self.pass_grads_through_encoder:
+            x = jax.lax.stop_gradient(x)
 
         x = nn.Dense(self.latent_dim)(x)
         x = nn.LayerNorm()(x)
         x = nn.tanh(x)
 
-        return NormalTanhPolicy(self.hidden_dims, self.action_dim)(x,
-                                                                   temperature)
+        return NormalTanhPolicy(self.hidden_dims, self.action_dim)(x, temperature)

@@ -4,7 +4,7 @@ import ml_collections
 def get_config():
     config = ml_collections.ConfigDict()
 
-    config.algo = 'sac'
+    config.algo = "sac"
 
     config.actor_lr = 3e-4
     config.critic_lr = 3e-4
@@ -20,6 +20,7 @@ def get_config():
 
     config.init_temperature = 1.0
     config.target_entropy = None
+    config.use_mean_reduction = False
 
     config.replay_buffer_size = int(1e6)
 

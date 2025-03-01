@@ -14,11 +14,11 @@ def get_config():
     config.critic_hidden_dims = (256, 256)
     config.actor_hidden_dims = (256, 256)
 
-    config.critic_cnn_features = (32, 32, 32, 32)
-    config.critic_cnn_strides = (2, 1, 1, 1)
+    config.critic_cnn_features = (32, 64, 128, 256)
+    config.critic_cnn_strides = (2, 2, 2, 2)
     config.actor_cnn_features = config_dict.placeholder(tuple)
     config.actor_cnn_strides = config_dict.placeholder(tuple)
-    config.cnn_padding = "VALID"
+    config.cnn_padding = "SAME"
     config.latent_dim = 50
 
     config.discount = 0.99
@@ -40,7 +40,7 @@ def get_config():
 
     config.replay_buffer_size = 100_000
 
-    config.gray_scale = False
-    config.image_size = 84
+    config.gray_scale = True
+    config.image_size = 64
 
     return config
